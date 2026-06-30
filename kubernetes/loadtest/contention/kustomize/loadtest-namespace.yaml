@@ -1,0 +1,16 @@
+---
+# Dedicated Kubernetes namespace for the contention test. athenz-identityprovider's
+# OPA policy derives the Athenz domain from the Kubernetes namespace (when
+# athenz.domain.prefix/suffix are empty), so a Pod in namespace "loadtest" with
+# a ServiceAccount "zts-contention" is authorized as Athenz service
+# loadtest.zts-contention — matching the ZMS registration done by setup-zms.sh.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: loadtest
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: zts-contention
+  namespace: loadtest

@@ -1,0 +1,39 @@
+---
+# MariaDB drop-in config: load the server_audit plugin at startup so the
+# audit log records every QUERY along with its return errno. Used by the
+# kubernetes/loadtest/contention overlay to count 1062 (Duplicate entry)
+# events fired from JDBCCertRecordStoreConnection's
+# INSERT → catch 1062 → UPDATE fallback path, without parsing application
+# logs.
+#
+# The .so ships with the mariadb-server package in the base image
+# (/usr/lib/mariadb/plugin/server_audit.so on linuxserver/mariadb 11.4) —
+# we just need to load and configure it. The plugin must be loaded at
+# server start (SET GLOBAL alone is not enough), and athenz-db uses
+# emptyDir for its data volume, so a restart-to-enable would wipe ZMS
+# data. Mounting this cnf as part of the base athenz-db kustomization
+# ensures every fresh deploy loads the plugin from boot.
+#
+# Log format (CSV, errno is the last field):
+#   YYYYMMDD HH:MM:SS,host,user,client,connid,qid,QUERY,db,'sql',errno
+# 1062 lines are counted with `grep -c ',1062$' /tmp/server_audit.log`.
+#
+# Why MariaDB-native and not performance_schema:
+#   MariaDB 11.4 does NOT implement MySQL's
+#   events_errors_summary_global_by_error table, so enabling
+#   performance_schema does not give us per-errno counters. server_audit
+#   is the MariaDB-shipped plugin that records errno directly.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: athenz-db-audit-conf
+data:
+  zz-audit.cnf: |
+    [mysqld]
+    plugin-load-add = server_audit.so
+    server_audit_logging          = ON
+    server_audit_events           = QUERY
+    server_audit_output_type      = file
+    server_audit_file_path        = /tmp/server_audit.log
+    server_audit_file_rotate_size = 100000000
+    server_audit_file_rotations   = 2

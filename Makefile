@@ -1,12 +1,18 @@
+ifeq ($(ATHENZ_REPO_URL),)
+ATHENZ_REPO_URL := https://github.com/AthenZ/athenz.git
+endif
+
 ifeq ($(wildcard athenz),)
-SUBMODULE := $(shell git submodule add --force https://github.com/AthenZ/athenz.git athenz)
+SUBMODULE := $(shell git submodule add --force $(ATHENZ_REPO_URL) athenz)
 else
+ifeq ($(ATHENZ_REF),)
 SUBMODULE := $(shell git submodule update --recursive)
+endif
 endif
 
 ifeq ($(DOCKER_TAG),)
 ifeq ($(VERSION),)
-VERSION := $(shell cat athenz/pom.xml | grep -E "<version>[0-9]+.[0-9]+.[0-9]+</version>" | head -n1 | sed -e 's/.*>\([0-9]*\.[0-9]*\.[0-9]*\)<.*/\1/g')
+VERSION := $(shell cat athenz/pom.xml | grep -E "<version>[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?</version>" | head -n1 | sed -e 's/.*>\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\(-[A-Za-z0-9.]*\)\{0,1\}\)<.*/\1/g')
 DOCKER_TAG := :latest
 ifeq ($(VERSION),)
 VERSION := $(shell curl -s https://api.github.com/repos/AthenZ/athenz/releases/latest | grep '"tag_name"' | sed -n 's/.*"tag_name": "v\([^"]*\)".*/\1/p')
@@ -18,6 +24,10 @@ endif
 
 ifeq ($(PATCH),)
 PATCH := true
+endif
+
+ifeq ($(ATHENZ_REF),)
+ATHENZ_REF := v$(VERSION)
 endif
 
 ifeq ($(PUSH),)
@@ -173,6 +183,7 @@ patch:
 	$(PATCH) && rsync -av --exclude=".gitkeep" patchfiles/* athenz
 
 build-java: checkout-version patch install-rdl-tools
+	export PATH="$$PATH:$$(go env GOPATH)/bin" && \
 	mvn -B clean install \
 		-f athenz/pom.xml \
 		-Dproject.basedir=athenz \
@@ -193,6 +204,8 @@ build-java: checkout-version patch install-rdl-tools
 		-pl libs/java/instance_provider \
 		-pl libs/java/cert_refresher \
 		-pl libs/java/dynamodb_client_factory \
+		-pl libs/java/syncer_common \
+		-pl libs/java/server_aws_common \
 		-pl rdl/rdl-gen-athenz-server \
 		-pl servers/zms \
 		-pl servers/zts \
@@ -209,6 +222,7 @@ build-go: checkout-version install-rdl-tools
 	cp $$GOPATH/bin/rdl* athenz/clients/go/zts/bin/ && \
 	mkdir -p athenz/clients/go/msd/bin && \
 	cp $$GOPATH/bin/rdl* athenz/clients/go/msd/bin/ && \
+	export PATH="$$PATH:$$GOPATH/bin" && \
 	mvn -B install \
 		-f athenz/pom.xml \
 		-Dproject.basedir=athenz \
@@ -249,13 +263,13 @@ checkout:
 	@cd athenz/ && git checkout .
 
 submodule-initialize:
-	@git submodule add --force https://github.com/AthenZ/athenz.git athenz
+	@git submodule add --force $(ATHENZ_REPO_URL) athenz
 
 submodule-update: checkout
 	@git submodule update --init --remote
 
 checkout-version: submodule-initialize submodule-update
-	@cd athenz/ && git fetch --refetch --tags origin && git checkout v$(VERSION)
+	@cd athenz/ && git fetch --refetch --tags origin && git checkout $(ATHENZ_REF)
 
 version:
 	@echo "Version: $(VERSION)"
@@ -505,6 +519,30 @@ test-kubernetes-athenz-loadtest:
 
 report-kubernetes-athenz-loadtest:
 	@DOCKER_REGISTRY=$(DOCKER_REGISTRY) $(MAKE) -C kubernetes report-athenz-loadtest
+
+deploy-kubernetes-athenz-zts-contention:
+	@DOCKER_REGISTRY=$(DOCKER_REGISTRY) $(MAKE) -C kubernetes deploy-zts-contention
+
+prepare-kubernetes-athenz-zts-contention:
+	@DOCKER_REGISTRY=$(DOCKER_REGISTRY) $(MAKE) -C kubernetes prepare-zts-contention
+
+sanity-kubernetes-athenz-zts-contention:
+	@DOCKER_REGISTRY=$(DOCKER_REGISTRY) $(MAKE) -C kubernetes sanity-zts-contention
+
+test-kubernetes-athenz-zts-contention:
+	@DOCKER_REGISTRY=$(DOCKER_REGISTRY) $(MAKE) -C kubernetes run-zts-contention
+
+report-kubernetes-athenz-zts-contention:
+	@DOCKER_REGISTRY=$(DOCKER_REGISTRY) $(MAKE) -C kubernetes report-zts-contention
+
+snapshot-kubernetes-athenz-zts-contention-errors:
+	@DOCKER_REGISTRY=$(DOCKER_REGISTRY) $(MAKE) -C kubernetes snapshot-zts-contention-errors
+
+reset-kubernetes-athenz-zts-contention:
+	@DOCKER_REGISTRY=$(DOCKER_REGISTRY) $(MAKE) -C kubernetes reset-zts-contention
+
+clean-kubernetes-athenz-zts-contention:
+	@DOCKER_REGISTRY=$(DOCKER_REGISTRY) $(MAKE) -C kubernetes clean-zts-contention
 
 test-kubernetes-athenz-envoy2envoyextauthz:
 	@DOCKER_REGISTRY=$(DOCKER_REGISTRY) $(MAKE) -C kubernetes test-athenz-envoy2envoyextauthz

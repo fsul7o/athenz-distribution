@@ -23,6 +23,13 @@ spec:
       volumes:
         - name: databases
           emptyDir: {}
+        # Drop-in MariaDB config to load the server_audit plugin at boot.
+        # Used by kubernetes/loadtest/contention to count 1062 (Duplicate
+        # entry) events from the audit log; harmless otherwise (logs to
+        # /tmp on the container). See audit-configmap.yaml.
+        - name: audit-conf
+          configMap:
+            name: athenz-db-audit-conf
       containers:
         - name: athenz-db
           image: ghcr.io/ctyano/athenz-db:latest
@@ -53,3 +60,11 @@ spec:
           volumeMounts:
             - name: databases
               mountPath: /config/databases/
+            # linuxserver/mariadb (the base image) reads /config/custom.cnf at
+            # startup. Mount our server_audit drop-in there. Path matters —
+            # the MariaDB default /etc/mysql/conf.d is not honored by this
+            # image's entrypoint.
+            - name: audit-conf
+              mountPath: /config/custom.cnf
+              subPath: zz-audit.cnf
+              readOnly: true

@@ -1,0 +1,25 @@
+---
+# Contention overlay.
+#
+# Resources shipped by this kustomization:
+#   * loadtest Namespace + zts-contention ServiceAccount
+#   * vegeta-contention Deployment (runs as zts-contention SA in loadtest ns)
+#
+# The server_audit plugin used to count 1062 errors is loaded by the BASE
+# athenz-db kustomization (kubernetes/athenz-db/kustomize/audit-configmap.yaml),
+# not by this overlay — server_audit must be loaded at server start, and
+# athenz-db uses emptyDir, so enabling it from this overlay would require
+# a restart that wipes ZMS data.
+#
+# Out-of-band side effects done by the Make target `deploy-contention`:
+#   * verify `server_audit` is ACTIVE in athenz-db
+#   * `kubectl ... get secret athenz-cacert -o yaml | ... apply -n loadtest`
+#     to replicate the CA bundle into the loadtest namespace
+#   * ConfigMaps vegeta-contention-bodies / vegeta-contention-targets
+#     are created/refreshed by `make prepare-contention`
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - loadtest-namespace.yaml
+  - vegeta-contention-deployment.yaml

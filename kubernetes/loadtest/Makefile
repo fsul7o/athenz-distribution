@@ -197,3 +197,38 @@ report-athenz-loadtest:
 	@echo "* Loadtest result is printed to html *"
 	@echo "**************************************"
 	@echo ""
+
+# -----------------------------------------------------------------------------
+# ZTS register contention loadtest
+#
+# Reproduces the production 1062 (Duplicate entry) errors fired from
+# JDBCCertRecordStoreConnection.insertX509CertRecord by issuing concurrent
+# POST /zts/v1/instance requests that all claim the same (provider,
+# instanceId, service) triple.
+#
+# See ./contention/README.md for details.
+# -----------------------------------------------------------------------------
+
+deploy-zts-contention:
+	$(MAKE) -C contention deploy-contention
+
+prepare-zts-contention:
+	$(MAKE) -C contention prepare-contention
+
+sanity-zts-contention:
+	$(MAKE) -C contention sanity-contention
+
+run-zts-contention:
+	$(MAKE) -C contention run-contention
+
+report-zts-contention:
+	$(MAKE) -C contention report-contention
+
+snapshot-zts-contention-errors:
+	$(MAKE) -C contention snapshot-mysql-errors
+
+reset-zts-contention:
+	$(MAKE) -C contention reset-contention
+
+clean-zts-contention:
+	$(MAKE) -C contention clean-contention

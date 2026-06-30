@@ -1,0 +1,100 @@
+---
+# vegeta Pod scoped to the loadtest namespace + zts-contention ServiceAccount.
+# The container's default mount at /var/run/secrets/kubernetes.io/serviceaccount/token
+# is the Kubernetes Service Account Token (SAT) that athenz-identityprovider's
+# OPA policy expects as attestationData. All parallel POST /zts/v1/instance
+# requests from this single Pod therefore share the SAT (= same POD_UID
+# claim) and ZTS derives the same Athenz instanceId for each, collapsing
+# 100 INSERTs onto one PK = 99 × 1062.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vegeta-contention
+  namespace: loadtest
+  labels:
+    app: vegeta-contention
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vegeta-contention
+  strategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: vegeta-contention
+    spec:
+      serviceAccountName: zts-contention
+      restartPolicy: Always
+      volumes:
+        - name: data
+          emptyDir: {}
+        - name: scratch
+          emptyDir: {}
+        # athenz-identityprovider's OPA validates the SAT's `aud` claim against
+        # its config (kubernetes.serviceaccount.token.audience =
+        # "https://kubernetes.default.svc"). The DEFAULT pod SAT mounted at
+        # /var/run/secrets/kubernetes.io/serviceaccount/token has the longer
+        # audience "https://kubernetes.default.svc.cluster.local" and fails
+        # validation. We add a projected SAT with the correct audience here
+        # at /var/run/secrets/zts-attestation/token; the run-contention loop
+        # reads it instead of the default mount.
+        - name: zts-attestation
+          projected:
+            sources:
+              - serviceAccountToken:
+                  audience: https://kubernetes.default.svc
+                  expirationSeconds: 3600
+                  path: token
+        - name: athenz-cacert
+          secret:
+            secretName: athenz-cacert
+            defaultMode: 0555
+            items:
+              - key: ca.cert.pem
+                path: ca-certificates.crt
+        - name: vegeta-bodies
+          configMap:
+            name: vegeta-contention-bodies
+            optional: true
+        - name: vegeta-targets
+          configMap:
+            name: vegeta-contention-targets
+            optional: true
+      containers:
+        - name: vegeta
+          image: ghcr.io/ctyano/docker-vegeta:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - tail
+            - -f
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: scratch
+              mountPath: /tmp/bodies
+            - name: athenz-cacert
+              mountPath: /etc/ssl/certs/ca-certificates.crt
+              subPath: ca-certificates.crt
+              readOnly: true
+            - name: vegeta-bodies
+              mountPath: /etc/vegeta-bodies-template
+              readOnly: true
+            - name: vegeta-targets
+              mountPath: /etc/vegeta-targets
+              readOnly: true
+            - name: zts-attestation
+              mountPath: /var/run/secrets/zts-attestation
+              readOnly: true
+# NOTE: the athenz-cacert Secret in the loadtest namespace is replicated from
+# the athenz namespace by `make deploy-contention` (see contention/Makefile),
+# not by this kustomization, because it embeds live secret data that should
+# not be committed.

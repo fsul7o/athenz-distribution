@@ -118,31 +118,31 @@ kind-load-images:
 		echo "Environment is correct. No driver change needed."; \
 	fi
 	kubectl config get-contexts kind-kind --no-headers=true | grep -E "^\* +kind-kind"
-	kind load docker-image \
-		docker.io/ghostunnel/ghostunnel:latest \
-		$(DOCKER_REGISTRY_EXTERNAL)crypki-softhsm:latest \
-		$(DOCKER_REGISTRY_EXTERNAL)certsigner-envoy:latest \
-		$(DOCKER_REGISTRY_EXTERNAL)athenz-user-cert:latest \
-		$(DOCKER_REGISTRY_EXTERNAL)athenz-plugins:latest
+# 	kind load docker-image \
+# 		docker.io/ghostunnel/ghostunnel:latest \
+# 		$(DOCKER_REGISTRY_EXTERNAL)crypki-softhsm:latest \
+# 		$(DOCKER_REGISTRY_EXTERNAL)certsigner-envoy:latest \
+# 		$(DOCKER_REGISTRY_EXTERNAL)athenz-user-cert:latest \
+# 		$(DOCKER_REGISTRY_EXTERNAL)athenz-plugins:latest
 	kind load docker-image \
 		$(DOCKER_REGISTRY)athenz-db:latest \
 		$(DOCKER_REGISTRY)athenz-zms-server:latest \
 		$(DOCKER_REGISTRY)athenz-zts-server:latest \
 		$(DOCKER_REGISTRY)athenz-cli:latest \
 		$(DOCKER_REGISTRY)athenz-ui:latest
-	kind load docker-image \
-		docker.io/ealen/echo-server:latest \
-		docker.io/dexidp/dex:latest \
-		docker.io/envoyproxy/envoy:v1.34-latest \
-		docker.io/openpolicyagent/kube-mgmt:latest \
-		docker.io/openpolicyagent/opa:latest-static \
-		docker.io/openpolicyagent/opa:0.66.0-static \
-		docker.io/portainer/kubectl-shell:latest \
-		quay.io/keycloak/keycloak:26.5.5 \
-		docker.io/library/postgres:alpine \
-		$(DOCKER_REGISTRY_EXTERNAL)k8s-athenz-sia:latest \
-		$(DOCKER_REGISTRY_EXTERNAL)docker-vegeta:latest \
-		docker.io/tatyano/authorization-proxy:latest
+# 	kind load docker-image \
+# 		docker.io/ealen/echo-server:latest \
+# 		docker.io/dexidp/dex:latest \
+# 		docker.io/envoyproxy/envoy:v1.34-latest \
+# 		docker.io/openpolicyagent/kube-mgmt:latest \
+# 		docker.io/openpolicyagent/opa:latest-static \
+# 		docker.io/openpolicyagent/opa:0.66.0-static \
+# 		docker.io/portainer/kubectl-shell:latest \
+# 		quay.io/keycloak/keycloak:26.5.5 \
+# 		docker.io/library/postgres:alpine \
+# 		$(DOCKER_REGISTRY_EXTERNAL)k8s-athenz-sia:latest \
+# 		$(DOCKER_REGISTRY_EXTERNAL)docker-vegeta:latest \
+# 		docker.io/tatyano/authorization-proxy:latest
 
 kind-shutdown:
 	kind delete cluster
@@ -518,5 +518,29 @@ test-athenz-loadtest:
 
 report-athenz-loadtest:
 	@$(MAKE) -C loadtest report-athenz-envoy-loadtest report-athenz-sidecar-loadtest report-athenz-envoyfilter-loadtest report-athenz-envoywebhook-loadtest report-athenz-authzproxy-loadtest report-athenz-echoserver-loadtest report-athenz-loadtest
+
+deploy-zts-contention:
+	@$(MAKE) -C loadtest deploy-zts-contention
+
+prepare-zts-contention:
+	@$(MAKE) -C loadtest prepare-zts-contention
+
+sanity-zts-contention:
+	@$(MAKE) -C loadtest sanity-zts-contention
+
+run-zts-contention:
+	@$(MAKE) -C loadtest run-zts-contention
+
+report-zts-contention:
+	@$(MAKE) -C loadtest report-zts-contention
+
+snapshot-zts-contention-errors:
+	@$(MAKE) -C loadtest snapshot-zts-contention-errors
+
+reset-zts-contention:
+	@$(MAKE) -C loadtest reset-zts-contention
+
+clean-zts-contention:
+	@$(MAKE) -C loadtest clean-zts-contention
 
 test-athenz: test-athenz-servers test-zms-cli test-athenz-ui test-zts-accesstoken test-policies test-verify

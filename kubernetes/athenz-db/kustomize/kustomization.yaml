@@ -10,8 +10,8 @@ resources:
 - namespace.yaml
 - service.yaml
 - statefulset.yaml
+- audit-configmap.yaml
 
-configMapGenerator:
 images:
 - name: ghcr.io/ctyano/athenz-db:latest
   newName: ghcr.io/ctyano/athenz-db
